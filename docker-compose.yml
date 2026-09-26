@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16
+    container_name: amigo_vizinhanca_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: amigo_vizinhanca
+      POSTGRES_USER: amigo_user
+      POSTGRES_PASSWORD: amigo_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
