@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from sqlalchemy import select, text
 
-from backend.app.database import engine
+from backend.app.database import SessionLocal, engine
+from backend.app.models import Categoria
 
 app = FastAPI(
     title="Amigo da Vizinhança API",
@@ -45,3 +46,19 @@ def db_health():
         "database": resultado[0],
         "user": resultado[1]
     }
+
+
+@app.get("/categorias")
+def listar_categorias():
+    with SessionLocal() as session:
+        categorias = session.scalars(
+            select(Categoria).order_by(Categoria.id)
+        ).all()
+
+        return [
+            {
+                "id": categoria.id,
+                "nome": categoria.nome
+            }
+            for categoria in categorias
+        ]
