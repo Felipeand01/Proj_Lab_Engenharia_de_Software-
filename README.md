@@ -68,7 +68,9 @@ O Codespaces fornece um ambiente de desenvolvimento padronizado para o grupo.
 │   ├── app/
 │   │   ├── __init__.py
 │   │   ├── database.py
-│   │   └── main.py
+│   │   ├── init_db.py
+│   │   ├── main.py
+│   │   └── models.py
 │   └── requirements.txt
 │
 ├── database/
@@ -132,6 +134,60 @@ Backend: FastAPI
 Banco de dados: amigo_vizinhanca
 Usuário PostgreSQL: amigo_user
 Status: ok
+```
+
+## Modelo de dados implementado na TG2
+
+Para iniciar a implementação do modelo de dados, foi criada a entidade **Categoria**, definida com SQLAlchemy e persistida no PostgreSQL.
+
+A tabela possui os seguintes campos:
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| id | Integer | Identificador único da categoria |
+| nome | String(50) | Nome da categoria, obrigatório e único |
+
+Foram cadastradas inicialmente as seguintes categorias:
+
+- Iluminação
+- Limpeza
+- Infraestrutura
+- Segurança
+- Outros
+
+Também foi criado o endpoint:
+
+```text
+GET /categorias
+```
+
+Esse endpoint consulta a tabela `categorias` no PostgreSQL e retorna os registros cadastrados.
+
+Exemplo de resposta:
+
+```json
+[
+  {
+    "id": 1,
+    "nome": "Iluminação"
+  },
+  {
+    "id": 2,
+    "nome": "Limpeza"
+  },
+  {
+    "id": 3,
+    "nome": "Infraestrutura"
+  },
+  {
+    "id": 4,
+    "nome": "Segurança"
+  },
+  {
+    "id": 5,
+    "nome": "Outros"
+  }
+]
 ```
 
 ## Execução do projeto
