@@ -1,0 +1,13 @@
+{
+  "name": "Amigo da Vizinhanca - TG2",
+  "image": "mcr.microsoft.com/devcontainers/universal:2-linux",
+  "forwardPorts": [8000, 8081],
+  "portsAttributes": {
+    "8000": {
+      "label": "FastAPI"
+    },
+    "8081": {
+      "label": "Expo / Metro"
+    }
+  }
+}
