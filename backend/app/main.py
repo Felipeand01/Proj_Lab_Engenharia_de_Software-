@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, text
 
@@ -62,3 +62,20 @@ def listar_categorias():
             }
             for categoria in categorias
         ]
+@app.get("/categorias/{categoria_id}")
+def buscar_categoria(categoria_id: int):
+    """Retorna uma categoria pelo ID informado."""
+
+    with SessionLocal() as session:
+        categoria = session.get(Categoria, categoria_id)
+
+        if categoria is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Categoria não encontrada"
+            )
+
+        return {
+            "id": categoria.id,
+            "nome": categoria.nome
+        }
