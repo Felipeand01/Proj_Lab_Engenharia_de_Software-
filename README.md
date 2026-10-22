@@ -10,7 +10,7 @@ O **Amigo da Vizinhança** é um aplicativo móvel colaborativo voltado ao regis
 - Felipe Marques Leite Martha
 - Felipe Matos De Souza
 
-## Etapa atual
+## Etapas do projeto
 
 ### TG2 - Kick-off do desenvolvimento
 
@@ -64,6 +64,10 @@ O Codespaces fornece um ambiente de desenvolvimento padronizado para o grupo.
 ├── .devcontainer/
 │   └── devcontainer.json
 │
+├── .github/
+│   └── workflows/
+│       └── backend-tests.yml
+│
 ├── backend/
 │   ├── app/
 │   │   ├── __init__.py
@@ -71,19 +75,18 @@ O Codespaces fornece um ambiente de desenvolvimento padronizado para o grupo.
 │   │   ├── init_db.py
 │   │   ├── main.py
 │   │   └── models.py
-│   └── requirements.txt
+│   ├── tests/
+│   │   ├── __init__.py
+│   │   ├── conftest.py
+│   │   └── test_main.py
+│   ├── requirements.txt
+│   └── requirements-dev.txt
 │
 ├── database/
-│
+├── docs/
 ├── mobile/
-│   ├── assets/
-│   ├── App.js
-│   ├── app.json
-│   ├── index.js
-│   ├── package.json
-│   └── package-lock.json
-│
 ├── docker-compose.yml
+├── pytest.ini
 ├── .gitignore
 └── README.md
 ```
@@ -190,6 +193,82 @@ Exemplo de resposta:
 ]
 ```
 
+### TG3 - Checkpoint 1: Backend e testes automatizados
+
+O primeiro checkpoint da TG3 teve como objetivo evoluir o backend da aplicação e implementar testes automatizados para os endpoints da API.
+
+Nesta etapa, foi adicionado o endpoint de consulta individual de categorias:
+
+```text
+GET /categorias/{categoria_id}
+```
+
+O endpoint retorna a categoria correspondente ao identificador informado. Caso a categoria não exista, a API retorna o código HTTP `404`.
+
+#### Endpoints testados
+
+Os testes automatizados verificam os seguintes endpoints:
+
+| Endpoint | Cenário | Resultado esperado |
+|---|---|---|
+| `GET /` | API disponível | `200 OK` |
+| `GET /health` | Backend funcionando | `200 OK` |
+| `GET /db-health` | Resposta do endpoint de verificação do banco | `200 OK` |
+| `GET /categorias` | Listagem de categorias | `200 OK` |
+| `GET /categorias/1` | Categoria existente | `200 OK` |
+| `GET /categorias/999` | Categoria inexistente | `404 Not Found` |
+| `GET /categorias/abc` | Identificador inválido | `422 Unprocessable Entity` |
+
+#### Testes automatizados
+
+Os testes foram desenvolvidos utilizando:
+
+- Pytest
+- FastAPI TestClient
+- HTTPX
+- pytest-html
+
+Os testes utilizam um banco isolado para evitar alterações no banco PostgreSQL utilizado durante o desenvolvimento da aplicação.
+
+Para executar todos os testes localmente:
+
+```bash
+python -m pytest
+```
+
+Resultado esperado:
+
+```text
+7 passed
+```
+
+#### GitHub Actions
+
+Também foi configurado um workflow de integração contínua utilizando GitHub Actions.
+
+O arquivo responsável pela automação está localizado em:
+
+```text
+.github/workflows/backend-tests.yml
+```
+
+A cada `push` ou `pull_request`, o GitHub Actions executa automaticamente as seguintes etapas:
+
+1. Obtém o código do repositório.
+2. Configura o Python 3.12.
+3. Instala as dependências do backend e dos testes.
+4. Executa os testes automatizados.
+5. Gera um relatório HTML com os resultados.
+6. Disponibiliza o relatório como artefato da execução.
+
+O relatório gerado pelo workflow é disponibilizado com o nome:
+
+```text
+backend-test-report
+```
+
+No Checkpoint 1, os sete testes automatizados foram executados com sucesso tanto no ambiente local quanto pelo GitHub Actions.
+
 ## Execução do projeto
 
 ### 1. Banco de dados
@@ -267,3 +346,29 @@ npx expo start --web --port 8081
 ```
 
 O frontend ficará disponível na porta **8081**.
+
+### 4. Testes automatizados
+
+Com o ambiente virtual do backend ativado, instalar as dependências de desenvolvimento:
+
+```bash
+pip install -r backend/requirements-dev.txt
+```
+
+Executar os testes automatizados:
+
+```bash
+python -m pytest
+```
+
+Resultado esperado:
+
+```text
+7 passed
+```
+
+Para gerar também o relatório HTML dos testes:
+
+```bash
+python -m pytest --html=relatorio_testes.html --self-contained-html
+```
