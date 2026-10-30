@@ -14,13 +14,20 @@ export default function App() {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
 
-  function obterUrlBackend() {
-    if (Platform.OS === 'web') {
-      return window.location.origin.replace('-8081.', '-8000.');
+ function obterUrlBackend() {
+  if (Platform.OS === 'web') {
+    if (
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1'
+    ) {
+      return 'http://localhost:8000';
     }
 
-    return '';
+    return window.location.origin.replace('-8081.', '-8000.');
   }
+
+  return '';
+}
 
   async function testarConexao() {
     setCarregando(true);
