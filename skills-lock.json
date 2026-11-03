@@ -1,11 +1,29 @@
 {
   "version": 1,
   "skills": {
+    "api-security-testing": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/api-security-testing/SKILL.md",
+      "computedHash": "4baa317508f5e01e72a0c292d3c9ea6a71249cfa3414971e97aa6e0fabae25f5"
+    },
+    "application-security-testing": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/application-security-testing/SKILL.md",
+      "computedHash": "5963d33bb6f5cfb0ce2657daa20090c922f68c309aa5906b9c80d1761fb33e05"
+    },
     "diagnosing-bugs": {
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/diagnosing-bugs/SKILL.md",
       "computedHash": "ede7254edbd22fcab97a0941511f7d440d8f9a249348fea97c50987ad5501674"
+    },
+    "explain-code": {
+      "source": "aakash-dhar/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/Development Skills/explain-code/SKILL.md",
+      "computedHash": "81773a3877633daea82a9066e47a78baa839096b13841923cfa189bc317e8ab6"
     },
     "fastapi": {
       "source": "fastapi/fastapi",
@@ -13,17 +31,41 @@
       "skillPath": "fastapi/.agents/skills/fastapi/SKILL.md",
       "computedHash": "2f0ff30756b435168276e1a7eb78c07856118575ea174535de7ed86dc88c9be4"
     },
+    "find-security-vulnerabilities-in-code": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/find-security-vulnerabilities-in-code/SKILL.md",
+      "computedHash": "551afea3693d77172cc83278bd6185cfb232be75e5c683506fd00b9630691272"
+    },
     "find-skills": {
       "source": "vercel-labs/skills",
       "sourceType": "github",
       "skillPath": "skills/find-skills/SKILL.md",
       "computedHash": "913b9d37d0d54047dd65222bb8c67b2bf04e3cb87dcad1729068d7a8b2c8c396"
     },
+    "fix-security-vulnerabilities-with-strix": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/fix-security-vulnerabilities-with-strix/SKILL.md",
+      "computedHash": "f5fcf1365bbaa650b246c9a0e6338db2e40ecc46fba60ff64fd2f6311eed901c"
+    },
     "grilling": {
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/productivity/grilling/SKILL.md",
       "computedHash": "e40cc1d348f6d935e28f1e24474302d7368f0a400429271a43b35fe154891dc5"
+    },
+    "logo-design": {
+      "source": "rampstackco/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/logo-design/SKILL.md",
+      "computedHash": "268eb7ad5ae687a3b9a72986257dbce8a0f11a41b3eace3bc887e7eefcbdd8ce"
+    },
+    "penetration-testing-with-strix": {
+      "source": "usestrix/strix",
+      "sourceType": "github",
+      "skillPath": "skills/penetration-testing-with-strix/SKILL.md",
+      "computedHash": "558f4693ddd1f1c3e0fc709465fa65ded2888811f638e74f839e3e72b6a6955c"
     },
     "ui-ux-pro-max": {
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",
