@@ -9,12 +9,7 @@ import {
   View,
 } from 'react-native';
 
-export default function App() {
-  const [dados, setDados] = useState(null);
-  const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState('');
-
- function obterUrlBackend() {
+function obterUrlBackend() {
   if (Platform.OS === 'web') {
     if (
       window.location.hostname === 'localhost' ||
@@ -29,24 +24,33 @@ export default function App() {
   return '';
 }
 
+async function obterDadosBackend() {
+  const backendUrl = obterUrlBackend();
+
+  if (!backendUrl) {
+    throw new Error('URL do backend não configurada para este dispositivo.');
+  }
+
+  const resposta = await fetch(`${backendUrl}/db-health`);
+
+  if (!resposta.ok) {
+    throw new Error('Não foi possível acessar o backend.');
+  }
+
+  return resposta.json();
+}
+
+export default function App() {
+  const [dados, setDados] = useState(null);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState('');
+
   async function testarConexao() {
     setCarregando(true);
     setErro('');
 
     try {
-      const backendUrl = obterUrlBackend();
-
-      if (!backendUrl) {
-        throw new Error('URL do backend não configurada para este dispositivo.');
-      }
-
-      const resposta = await fetch(`${backendUrl}/db-health`);
-
-      if (!resposta.ok) {
-        throw new Error('Não foi possível acessar o backend.');
-      }
-
-      const resultado = await resposta.json();
+      const resultado = await obterDadosBackend();
       setDados(resultado);
     } catch (error) {
       setDados(null);
@@ -57,7 +61,32 @@ export default function App() {
   }
 
   useEffect(() => {
-    testarConexao();
+    let ativo = true;
+
+    async function carregarInicialmente() {
+      try {
+        const resultado = await obterDadosBackend();
+
+        if (ativo) {
+          setDados(resultado);
+        }
+      } catch (error) {
+        if (ativo) {
+          setDados(null);
+          setErro(error.message);
+        }
+      } finally {
+        if (ativo) {
+          setCarregando(false);
+        }
+      }
+    }
+
+    carregarInicialmente();
+
+    return () => {
+      ativo = false;
+    };
   }, []);
 
   return (

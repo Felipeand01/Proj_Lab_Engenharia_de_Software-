@@ -6,9 +6,7 @@ from fastapi.testclient import TestClient
 
 TEST_DB_PATH = Path(__file__).parent / "test.db"
 
-os.environ["DATABASE_URL"] = (
-    f"sqlite:///{TEST_DB_PATH}?check_same_thread=false"
-)
+os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH}?check_same_thread=false"
 
 from backend.app.database import SessionLocal, engine
 from backend.app.main import app

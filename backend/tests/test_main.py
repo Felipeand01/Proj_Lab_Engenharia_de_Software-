@@ -2,18 +2,14 @@ def test_inicio(client):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "message": "API do Amigo da Vizinhança funcionando!"
-    }
+    assert response.json() == {"message": "API do Amigo da Vizinhança funcionando!"}
 
 
 def test_health(client):
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "ok"
-    }
+    assert response.json() == {"status": "ok"}
 
 
 def test_db_health(client, monkeypatch):
@@ -35,10 +31,7 @@ def test_db_health(client, monkeypatch):
         def connect(self):
             return ConexaoFalsa()
 
-    monkeypatch.setattr(
-        "backend.app.main.engine",
-        EngineFalso()
-    )
+    monkeypatch.setattr("backend.app.main.engine", EngineFalso())
 
     response = client.get("/db-health")
 
@@ -46,7 +39,7 @@ def test_db_health(client, monkeypatch):
     assert response.json() == {
         "status": "ok",
         "database": "amigo_vizinhanca_test",
-        "user": "amigo_user_test"
+        "user": "amigo_user_test",
     }
 
 
@@ -73,10 +66,7 @@ def test_buscar_categoria_existente(client):
 
     assert response.status_code == 200
 
-    assert response.json() == {
-        "id": 1,
-        "nome": "Iluminação"
-    }
+    assert response.json() == {"id": 1, "nome": "Iluminação"}
 
 
 def test_buscar_categoria_inexistente(client):
@@ -84,9 +74,7 @@ def test_buscar_categoria_inexistente(client):
 
     assert response.status_code == 404
 
-    assert response.json() == {
-        "detail": "Categoria não encontrada"
-    }
+    assert response.json() == {"detail": "Categoria não encontrada"}
 
 
 def test_buscar_categoria_id_invalido(client):
