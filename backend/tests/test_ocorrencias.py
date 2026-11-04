@@ -127,15 +127,15 @@ def test_listar_e_consultar_sem_token(client, morador):
 def test_listar_filtra_por_categoria_e_status(client, morador):
     iluminacao = criar(client, morador, categoria_id=1)
     outra = criar(client, morador, categoria_id=2)
-    definir_status(outra["id"], "Arquivado")
+    definir_status(outra["id"], "Em análise")
 
     por_categoria = client.get("/ocorrencias?categoria_id=1").json()
-    por_status = client.get("/ocorrencias?status=Arquivado").json()
+    por_status = client.get("/ocorrencias?status=Em análise").json()
 
     assert iluminacao["id"] in [o["id"] for o in por_categoria]
     assert all(o["categoria"]["id"] == 1 for o in por_categoria)
     assert outra["id"] in [o["id"] for o in por_status]
-    assert all(o["status"] == "Arquivado" for o in por_status)
+    assert all(o["status"] == "Em análise" for o in por_status)
     assert outra["id"] not in [o["id"] for o in por_categoria]
 
 
@@ -195,7 +195,16 @@ def test_confirmar_inexistente_retorna_404(client, morador):
     )
 
 
-def test_confirmar_arquivada_retorna_409(client, morador):
+def test_confirmar_arquivada_retorna_409_para_o_autor(client, morador):
+    criada = criar(client, morador)
+    definir_status(criada["id"], "Arquivado")
+
+    resposta = client.post(f"/ocorrencias/{criada['id']}/confirmar", headers=morador)
+
+    assert resposta.status_code == 409
+
+
+def test_confirmar_arquivada_de_outro_autor_retorna_404(client, morador):
     criada = criar(client, morador)
     definir_status(criada["id"], "Arquivado")
 
@@ -203,7 +212,7 @@ def test_confirmar_arquivada_retorna_409(client, morador):
         f"/ocorrencias/{criada['id']}/confirmar", headers=autenticar(client)
     )
 
-    assert resposta.status_code == 409
+    assert resposta.status_code == 404
 
 
 # --- minhas ocorrências ---

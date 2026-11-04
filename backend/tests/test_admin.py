@@ -112,7 +112,8 @@ def test_transicao_invalida_retorna_409_sem_alterar(client, admin, inicial, novo
     resposta = mudar(client, admin, criada["id"], novo)
 
     assert resposta.status_code == 409
-    detalhe = client.get(f"/ocorrencias/{criada['id']}").json()
+    # Lido pelo admin: se o inicial for Arquivado, o público não enxerga o registro.
+    detalhe = client.get(f"/ocorrencias/{criada['id']}", headers=admin).json()
     assert detalhe["status"] == inicial
     assert len(detalhe["historico"]) == 1
 
@@ -180,9 +181,9 @@ def test_arquivar_inexistente_retorna_404(client, admin):
 def test_ocorrencia_arquivada_nao_aceita_confirmacao(client, admin, ocorrencia):
     arquivar(client, admin, ocorrencia["id"])
 
-    resposta = client.post(
-        f"/ocorrencias/{ocorrencia['id']}/confirmar", headers=autenticar(client)
-    )
+    # O administrador enxerga a arquivada, mas ela não aceita confirmações (409).
+    # Para terceiros ela nem existe (404): ver test_visibilidade_arquivadas.py.
+    resposta = client.post(f"/ocorrencias/{ocorrencia['id']}/confirmar", headers=admin)
 
     assert resposta.status_code == 409
 

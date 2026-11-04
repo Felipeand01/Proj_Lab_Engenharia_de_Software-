@@ -61,23 +61,41 @@ def get_db() -> Iterator[Session]:
         yield session
 
 
+def _usuario_do_token(
+    credenciais: HTTPAuthorizationCredentials | None, db: Session
+) -> Usuario | None:
+    if credenciais is None:
+        return None
+    usuario_id = ler_token(credenciais.credentials)
+    return db.get(Usuario, usuario_id) if usuario_id is not None else None
+
+
 def usuario_atual(
     credenciais: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: Session = Depends(get_db),
 ) -> Usuario:
     """Exige token válido e devolve o usuário; caso contrário, 401."""
-    erro = HTTPException(
-        status_code=401,
-        detail="Não autenticado",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    if credenciais is None:
-        raise erro
-    usuario_id = ler_token(credenciais.credentials)
-    usuario = db.get(Usuario, usuario_id) if usuario_id is not None else None
+    usuario = _usuario_do_token(credenciais, db)
     if usuario is None:
-        raise erro
+        raise HTTPException(
+            status_code=401,
+            detail="Não autenticado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return usuario
+
+
+def usuario_opcional(
+    credenciais: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(get_db),
+) -> Usuario | None:
+    """Usuário do token ou None (visitante), para rotas públicas.
+
+    Token ausente, inválido, expirado ou de usuário inexistente vira visitante, e não
+    erro 401: o app envia o token em todas as chamadas, e um token vencido não pode
+    quebrar a consulta pública nem conceder privilégio algum.
+    """
+    return _usuario_do_token(credenciais, db)
 
 
 def exige_admin(usuario: Usuario = Depends(usuario_atual)) -> Usuario:

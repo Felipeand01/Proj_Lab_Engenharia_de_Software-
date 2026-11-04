@@ -278,8 +278,8 @@ No Checkpoint 1, os sete testes automatizados foram executados com sucesso tanto
 | `POST /auth/cadastro` | público | Cria conta de morador (o papel nunca vem do cliente) |
 | `POST /auth/login` | público | Devolve o token JWT |
 | `GET /auth/me` | autenticado | Dados do usuário do token |
-| `GET /ocorrencias` | público | Lista, com filtros `categoria_id` e `status` |
-| `GET /ocorrencias/{id}` | público | Detalhes e histórico |
+| `GET /ocorrencias` | público | Lista, com filtros `categoria_id` e `status`. Não inclui arquivadas (só o administrador as recebe) |
+| `GET /ocorrencias/{id}` | público | Detalhes e histórico. Arquivada: `404`, exceto para o autor e o administrador |
 | `POST /ocorrencias` | autenticado | Cria ocorrência (status inicial `Reportado`) |
 | `POST /ocorrencias/{id}/confirmar` | autenticado | Confirma a ocorrência (uma vez por usuário) |
 | `GET /minhas-ocorrencias` | autenticado | Ocorrências criadas e confirmadas pelo usuário |
@@ -292,6 +292,22 @@ No Checkpoint 1, os sete testes automatizados foram executados com sucesso tanto
 Fluxo de status: `Reportado → Em análise → Encaminhado → Em andamento → Resolvido`. O administrador pode arquivar (com motivo) a partir de qualquer status, exceto `Resolvido` e `Arquivado`, que são finais. Confirmações da comunidade não alteram status nem prioridade.
 
 A autenticação usa o cabeçalho `Authorization: Bearer <token>`.
+
+### Visibilidade das ocorrências arquivadas
+
+Pelo TG1, o conteúdo arquivado deixa de aparecer nas consultas públicas, mas o registro e o histórico são preservados para a administração.
+
+| Quem | Lista e mapa | Detalhe por ID | "Criadas por mim" | "Confirmadas por mim" |
+|---|---|---|---|---|
+| Visitante ou outro morador | não aparece | `404` | — | não aparece |
+| Autor | não aparece na lista pública | vê, com o motivo | vê | — |
+| Administrador | vê (inclusive `status=Arquivado`) | vê | — | — |
+
+- Para quem não pode ver, a resposta é igual à de uma ocorrência inexistente (`404`), sem revelar que o registro existe. `?status=Arquivado` devolve lista vazia para não administradores.
+- Token ausente, inválido ou expirado nas consultas públicas é tratado como visitante, sem erro `401`.
+- Confirmar uma arquivada: `401` sem login, `404` para outro morador e `409` para o autor e o administrador.
+- Os indicadores do administrador continuam contando as arquivadas.
+- **Risco residual:** a foto de uma ocorrência arquivada continua acessível por quem já conhece a URL (o endereço é aleatório, mas não é revogado). Uma solução futura de moderação é excluir a imagem do armazenamento ao arquivar, ou servir fotos por URL assinada com expiração.
 
 ## Execução do projeto
 

@@ -15,7 +15,7 @@ from backend.app.schemas import (
     OcorrenciaIn,
     OcorrenciaOut,
 )
-from backend.app.security import get_db, usuario_atual
+from backend.app.security import get_db, usuario_atual, usuario_opcional
 from backend.app.status import ARQUIVADO, REPORTADO, TODOS_STATUS, registrar_mudanca
 
 router = APIRouter(tags=["Ocorrências"])
@@ -64,14 +64,44 @@ def buscar_ou_404(db: Session, ocorrencia_id: int) -> Ocorrencia:
     return ocorrencia
 
 
+def pode_ver(ocorrencia: Ocorrencia, usuario: Usuario | None) -> bool:
+    """Arquivada só é visível para o administrador e para o autor (TG1, RN8)."""
+    if ocorrencia.status != ARQUIVADO:
+        return True
+    return usuario is not None and (
+        usuario.papel == "admin" or usuario.id == ocorrencia.autor_id
+    )
+
+
+def buscar_visivel_ou_404(
+    db: Session, ocorrencia_id: int, usuario: Usuario | None
+) -> Ocorrencia:
+    """Como buscar_ou_404, mas oculta arquivadas de quem não pode vê-las.
+
+    A resposta é idêntica à de uma ocorrência inexistente, para não revelar que o
+    registro existe.
+    """
+    ocorrencia = buscar_ou_404(db, ocorrencia_id)
+    if not pode_ver(ocorrencia, usuario):
+        raise HTTPException(status_code=404, detail="Ocorrência não encontrada")
+    return ocorrencia
+
+
 @router.get("/ocorrencias", response_model=list[OcorrenciaOut])
 def listar(
     categoria_id: int | None = None,
     status: StatusFiltro | None = None,
     db: Session = Depends(get_db),
+    usuario: Usuario | None = Depends(usuario_opcional),
 ):
-    """Lista ocorrências (público), da mais recente para a mais antiga."""
+    """Lista ocorrências, da mais recente para a mais antiga.
+
+    Pública, mas sem arquivadas: só o administrador as recebe (inclusive com
+    `status=Arquivado`; para os demais esse filtro devolve lista vazia).
+    """
     consulta = select(Ocorrencia).options(*CARREGAR).order_by(Ocorrencia.id.desc())
+    if usuario is None or usuario.papel != "admin":
+        consulta = consulta.where(Ocorrencia.status != ARQUIVADO)
     if categoria_id is not None:
         consulta = consulta.where(Ocorrencia.categoria_id == categoria_id)
     if status is not None:
@@ -80,9 +110,13 @@ def listar(
 
 
 @router.get("/ocorrencias/{ocorrencia_id}", response_model=OcorrenciaDetalhe)
-def consultar(ocorrencia_id: int, db: Session = Depends(get_db)):
-    """Detalhes e histórico de uma ocorrência (público)."""
-    return detalhe(buscar_ou_404(db, ocorrencia_id))
+def consultar(
+    ocorrencia_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario | None = Depends(usuario_opcional),
+):
+    """Detalhes e histórico (público). Arquivada: 404, salvo para o autor e o admin."""
+    return detalhe(buscar_visivel_ou_404(db, ocorrencia_id, usuario))
 
 
 @router.post("/ocorrencias", response_model=OcorrenciaDetalhe, status_code=201)
@@ -135,7 +169,7 @@ def confirmar(
     usuario: Usuario = Depends(usuario_atual),
 ):
     """Confirma uma ocorrência (uma vez por usuário). Não altera o status."""
-    ocorrencia = buscar_ou_404(db, ocorrencia_id)
+    ocorrencia = buscar_visivel_ou_404(db, ocorrencia_id, usuario)
     if ocorrencia.status == ARQUIVADO:
         raise HTTPException(status_code=409, detail="Ocorrência arquivada")
 
@@ -162,11 +196,17 @@ def confirmar(
 
 @router.get("/minhas-ocorrencias", response_model=MinhasOcorrenciasOut)
 def minhas(db: Session = Depends(get_db), usuario: Usuario = Depends(usuario_atual)):
-    """Ocorrências criadas e confirmadas pelo usuário autenticado."""
+    """Ocorrências criadas e confirmadas pelo usuário autenticado.
+
+    As criadas incluem as próprias arquivadas (o autor pode ver o motivo); as
+    confirmadas nunca incluem arquivadas, que deixam de ser públicas.
+    """
     base = select(Ocorrencia).options(*CARREGAR).order_by(Ocorrencia.id.desc())
     criadas = db.scalars(base.where(Ocorrencia.autor_id == usuario.id))
     confirmadas = db.scalars(
-        base.join(Confirmacao).where(Confirmacao.usuario_id == usuario.id)
+        base.join(Confirmacao).where(
+            Confirmacao.usuario_id == usuario.id, Ocorrencia.status != ARQUIVADO
+        )
     )
     return MinhasOcorrenciasOut(
         criadas=[resumo(o) for o in criadas],

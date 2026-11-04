@@ -12,14 +12,17 @@ import { useCarregar } from '../../lib/use-carregar';
 import { cores, fonte } from '../../theme';
 
 export default function ListaOcorrencias() {
-  const { api } = useAuth();
+  const { api, admin } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams();
   const [categoriaId, setCategoriaId] = useState(null);
   const [categorias, setCategorias] = useState([]);
 
+  // Arquivadas só existem para o administrador (a API as oculta dos demais).
+  const statusDisponiveis = admin ? STATUS : STATUS.filter((s) => s !== 'Arquivado');
+
   // O status fica na URL: o painel do administrador abre a lista já filtrada.
-  const status = STATUS.includes(params.status) ? params.status : null;
+  const status = statusDisponiveis.includes(params.status) ? params.status : null;
   const setStatus = (valor) => router.setParams({ status: valor ?? undefined });
 
   useEffect(() => {
@@ -57,7 +60,7 @@ export default function ListaOcorrencias() {
       <Text style={styles.rotulo}>Status</Text>
       <View style={styles.chips}>
         <Chip rotulo="Todos" ativo={status === null} onPress={() => setStatus(null)} />
-        {STATUS.map((s) => (
+        {statusDisponiveis.map((s) => (
           <Chip key={s} rotulo={s} ativo={status === s} onPress={() => setStatus(s)} />
         ))}
       </View>
