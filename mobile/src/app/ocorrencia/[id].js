@@ -126,6 +126,10 @@ export default function DetalheOcorrencia() {
 
       <View style={styles.bloco}>
         <Text style={styles.secao}>Histórico</Text>
+        <Text style={styles.meta}>
+          Os status são atualizados pela equipe do aplicativo e representam um acompanhamento demonstrativo, sem
+          integração oficial com órgãos públicos.
+        </Text>
         {o.historico.map((h, i) => (
           <View key={i} style={styles.item}>
             <Text style={styles.itemTitulo}>

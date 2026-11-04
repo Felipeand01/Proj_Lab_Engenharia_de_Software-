@@ -164,6 +164,10 @@ function Formulario() {
         maxLength={2000}
         erro={erros.descricao}
       />
+      {/* Texto fixo (e não o `ajuda` do Campo, que some quando há erro de validação). */}
+      <Text style={styles.ajuda}>
+        Evite incluir documentos, contatos, dados pessoais ou rostos identificáveis na descrição e na fotografia.
+      </Text>
 
       <View style={styles.grupo}>
         <Text style={styles.rotulo}>Local</Text>
