@@ -12,6 +12,13 @@ node_modules/
 # Variáveis de ambiente
 .env
 .env.*
+!.env.example
+
+# Fotos do armazenamento local de desenvolvimento
+backend/uploads/
+
+# Artefatos locais do Playwright
+.playwright-mcp/
 
 # Sistema operacional
 .DS_Store

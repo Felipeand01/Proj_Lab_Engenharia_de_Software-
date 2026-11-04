@@ -2,3 +2,8 @@ fastapi
 uvicorn[standard]
 sqlalchemy
 psycopg[binary]
+argon2-cffi
+PyJWT
+python-multipart
+Pillow
+httpx

@@ -70,24 +70,26 @@ O Codespaces fornece um ambiente de desenvolvimento padronizado para o grupo.
 │
 ├── backend/
 │   ├── app/
-│   │   ├── __init__.py
+│   │   ├── routers/          # auth, ocorrencias e admin
 │   │   ├── database.py
-│   │   ├── init_db.py
+│   │   ├── init_db.py        # cria tabelas e categorias iniciais
 │   │   ├── main.py
-│   │   └── models.py
+│   │   ├── models.py
+│   │   ├── schemas.py
+│   │   ├── security.py       # hash de senha, JWT e permissões
+│   │   ├── seed.py           # categorias e primeiro administrador
+│   │   └── status.py         # regras de status das ocorrências
 │   ├── tests/
-│   │   ├── __init__.py
-│   │   ├── conftest.py
-│   │   └── test_main.py
 │   ├── requirements.txt
 │   └── requirements-dev.txt
 │
 ├── database/
 ├── docs/
 ├── mobile/
+├── .env.example
 ├── docker-compose.yml
 ├── pytest.ini
-├── .gitignore
+├── ruff.toml
 └── README.md
 ```
 
@@ -269,63 +271,108 @@ backend-test-report
 
 No Checkpoint 1, os sete testes automatizados foram executados com sucesso tanto no ambiente local quanto pelo GitHub Actions.
 
+## API do backend (TG3)
+
+| Método e rota | Acesso | Descrição |
+|---|---|---|
+| `POST /auth/cadastro` | público | Cria conta de morador (o papel nunca vem do cliente) |
+| `POST /auth/login` | público | Devolve o token JWT |
+| `GET /auth/me` | autenticado | Dados do usuário do token |
+| `GET /ocorrencias` | público | Lista, com filtros `categoria_id` e `status` |
+| `GET /ocorrencias/{id}` | público | Detalhes e histórico |
+| `POST /ocorrencias` | autenticado | Cria ocorrência (status inicial `Reportado`) |
+| `POST /ocorrencias/{id}/confirmar` | autenticado | Confirma a ocorrência (uma vez por usuário) |
+| `GET /minhas-ocorrencias` | autenticado | Ocorrências criadas e confirmadas pelo usuário |
+| `PATCH /admin/ocorrencias/{id}/status` | administrador | Avança o status no fluxo |
+| `POST /admin/ocorrencias/{id}/arquivar` | administrador | Arquiva, com motivo obrigatório |
+| `GET /admin/indicadores` | administrador | Totais por status e categoria |
+| `GET /categorias`, `GET /categorias/{id}` | público | Categorias |
+| `GET /`, `/health`, `/db-health` | público | Verificações da API e do banco |
+
+Fluxo de status: `Reportado → Em análise → Encaminhado → Em andamento → Resolvido`. O administrador pode arquivar (com motivo) a partir de qualquer status, exceto `Resolvido` e `Arquivado`, que são finais. Confirmações da comunidade não alteram status nem prioridade.
+
+A autenticação usa o cabeçalho `Authorization: Bearer <token>`.
+
 ## Execução do projeto
 
-### 1. Banco de dados
+Todos os comandos partem da raiz do repositório. Pré-requisitos: Python 3.12, Docker com Docker Compose, Node 22 (frontend).
 
-Na raiz do projeto, iniciar o PostgreSQL com Docker Compose:
+### 1. Variáveis de ambiente
+
+```bash
+cp .env.example .env
+```
+
+Edite o `.env` (ele não é versionado):
+
+| Variável | Obrigatória | Descrição |
+|---|---|---|
+| `DATABASE_URL` | não | Padrão: PostgreSQL do `docker-compose.yml` em `localhost:5432` |
+| `JWT_SECRET` | **sim** | Mínimo de 32 caracteres. Sem ela a API não inicia |
+| `JWT_EXPIRA_MINUTOS` | não | Validade do token (padrão 60) |
+| `CORS_ORIGINS` | não | Origens permitidas, separadas por vírgula (padrão: Expo local, portas 8081 e 19006) |
+| `CORS_ORIGIN_REGEX` | não | Regex de origens extras, por exemplo URLs do Codespaces. Vazio em produção |
+| `ADMIN_EMAIL`, `ADMIN_SENHA`, `ADMIN_NOME` | só para criar o admin | Credenciais do primeiro administrador (senha com mínimo de 8 caracteres) |
+
+Gere um segredo para o JWT e coloque no `.env`:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Carregue as variáveis no terminal onde for usar o backend (a aplicação lê o ambiente, não o arquivo):
+
+```bash
+set -a; source .env; set +a
+```
+
+### 2. Banco de dados
+
+Iniciar o PostgreSQL com Docker Compose:
 
 ```bash
 docker compose up -d db
-```
-
-Para verificar se o container está em execução:
-
-```bash
 docker compose ps
 ```
 
-### 2. Backend
+### 3. Backend
 
-Criar o ambiente virtual Python, caso ainda não exista:
+Criar o ambiente virtual e instalar as dependências (use `requirements-dev.txt` se também for rodar testes e lint):
 
 ```bash
 python -m venv backend/.venv
-```
-
-Ativar o ambiente virtual:
-
-```bash
 source backend/.venv/bin/activate
+pip install -r backend/requirements-dev.txt
 ```
 
-Instalar as dependências:
+Criar as tabelas e as categorias iniciais (pode ser repetido sem problemas):
 
 ```bash
-pip install -r backend/requirements.txt
+python -m backend.app.init_db
 ```
 
-Executar o FastAPI:
+Criar o primeiro administrador (lê `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` do ambiente; repetir não duplica a conta nem troca a senha):
+
+```bash
+python -m backend.app.seed
+```
+
+Executar a API:
 
 ```bash
 uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir backend
 ```
 
-O backend ficará disponível na porta **8000**.
+O backend fica na porta **8000**. A documentação automática do FastAPI está em:
 
-Para testar somente a API:
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
 
-```text
-/
-```
+Para rotas protegidas no Swagger, faça login em `POST /auth/login` e informe o token no botão **Authorize**.
 
-Para testar a conexão com o PostgreSQL:
+Verificações rápidas: `/` (API) e `/db-health` (conexão com o PostgreSQL).
 
-```text
-/db-health
-```
-
-### 3. Frontend
+### 4. Frontend
 
 Em outro terminal, entrar na pasta do aplicativo:
 
@@ -347,28 +394,32 @@ npx expo start --web --port 8081
 
 O frontend ficará disponível na porta **8081**.
 
-### 4. Testes automatizados
+### 5. Testes automatizados
 
-Com o ambiente virtual do backend ativado, instalar as dependências de desenvolvimento:
-
-```bash
-pip install -r backend/requirements-dev.txt
-```
-
-Executar os testes automatizados:
+Com o ambiente virtual ativado e as dependências de desenvolvimento instaladas:
 
 ```bash
 python -m pytest
 ```
 
-Resultado esperado:
+Todos os testes devem passar. Por padrão eles usam um banco SQLite descartável, sem tocar no PostgreSQL de desenvolvimento, e não precisam do `.env` (o `JWT_SECRET` de teste é definido pelo `conftest.py`).
 
-```text
-7 passed
+Para rodar a mesma suíte em um PostgreSQL de teste, use um banco **separado**, pois os testes apagam e recriam as tabelas dele:
+
+```bash
+docker compose exec db psql -U amigo_user -d amigo_vizinhanca -c "CREATE DATABASE amigo_teste"
+TEST_DATABASE_URL="postgresql+psycopg://amigo_user:amigo_pass@localhost:5432/amigo_teste" python -m pytest
 ```
 
-Para gerar também o relatório HTML dos testes:
+Relatório HTML dos testes:
 
 ```bash
 python -m pytest --html=relatorio_testes.html --self-contained-html
+```
+
+Lint e formatação:
+
+```bash
+ruff check backend
+ruff format --check backend
 ```

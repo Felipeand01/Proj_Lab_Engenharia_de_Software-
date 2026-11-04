@@ -1,13 +1,22 @@
 {
   "name": "mobile",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "expo-router/entry",
   "dependencies": {
     "expo": "~57.0.25",
+    "expo-constants": "~57.0.22",
+    "expo-image-picker": "~57.0.20",
+    "expo-linking": "~57.0.13",
+    "expo-location": "~57.0.22",
+    "expo-router": "~57.0.29",
+    "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
+    "maplibre-gl": "^6.16.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
     "react-native-web": "^0.21.2"
   },
   "scripts": {
@@ -15,6 +24,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "export:web": "expo export --platform web",
     "lint": "expo lint"
   },
   "private": true,

@@ -12,35 +12,19 @@ def test_health(client):
     assert response.json() == {"status": "ok"}
 
 
-def test_db_health(client, monkeypatch):
-    class ResultadoFalso:
-        def one(self):
-            return ("amigo_vizinhanca_test", "amigo_user_test")
-
-    class ConexaoFalsa:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc_value, traceback):
-            pass
-
-        def execute(self, query):
-            return ResultadoFalso()
-
-    class EngineFalso:
-        def connect(self):
-            return ConexaoFalsa()
-
-    monkeypatch.setattr("backend.app.main.engine", EngineFalso())
-
+def test_db_health_consulta_o_banco_e_nao_expoe_detalhes(client):
     response = client.get("/db-health")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "ok",
-        "database": "amigo_vizinhanca_test",
-        "user": "amigo_user_test",
-    }
+    # Resposta pública: sem nome do banco, usuário ou qualquer detalhe interno.
+    assert response.json() == {"status": "ok"}
+
+
+def test_engine_valida_conexoes_antes_de_usar():
+    from backend.app.database import engine
+
+    # Bancos gerenciados (Neon/Render) suspendem conexões ociosas.
+    assert engine.pool._pre_ping is True
 
 
 def test_listar_categorias(client):
