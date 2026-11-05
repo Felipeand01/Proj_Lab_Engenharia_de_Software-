@@ -236,6 +236,36 @@ def test_falha_do_cloudinary_retorna_502_e_nao_altera_a_ocorrencia(
     assert client.get(f"/ocorrencias/{ocorrencia['id']}").json()["foto_url"] is None
 
 
+def test_erro_http_do_cloudinary_registra_so_o_codigo_de_status(
+    client, morador, ocorrencia, cloudinary, monkeypatch, caplog
+):
+    url_secreta = "https://api.cloudinary.com/v1_1/nuvem-teste/image/upload"
+    requisicao = fotos.httpx.Request("POST", url_secreta)
+    resposta_http = fotos.httpx.Response(
+        403, request=requisicao, text="corpo-sensivel-da-resposta"
+    )
+
+    def falso(url, **kwargs):
+        return RespostaFalsa(
+            erro=fotos.httpx.HTTPStatusError(
+                "mensagem com " + url_secreta,
+                request=requisicao,
+                response=resposta_http,
+            )
+        )
+
+    monkeypatch.setattr(fotos.httpx, "post", falso)
+
+    with caplog.at_level("ERROR", logger=fotos.logger.name):
+        resposta = enviar(client, ocorrencia["id"], morador)
+
+    assert resposta.status_code == 502
+    assert resposta.json()["detail"] == "Não foi possível armazenar a foto agora"
+    assert "Upload Cloudinary falhou: HTTP 403" in caplog.text
+    for proibido in ("nuvem-teste", "chave-teste", "segredo-teste", "corpo-sensivel"):
+        assert proibido not in caplog.text
+
+
 def test_resposta_do_cloudinary_sem_secure_url_retorna_502(
     client, morador, ocorrencia, cloudinary, monkeypatch
 ):

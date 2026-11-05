@@ -77,8 +77,11 @@ def _salvar_cloudinary(jpeg: bytes) -> str:
         resposta.raise_for_status()
         return resposta.json()["secure_url"]
     except (httpx.HTTPError, KeyError, ValueError) as erro:
-        # Registra só o tipo do erro: a mensagem pode conter a URL da requisição.
-        logger.error("Falha ao enviar foto ao Cloudinary: %s", type(erro).__name__)
+        # Registra só o código HTTP ou o tipo do erro: a mensagem pode conter a URL da requisição.
+        if isinstance(erro, httpx.HTTPStatusError):
+            logger.error("Upload Cloudinary falhou: HTTP %s", erro.response.status_code)
+        else:
+            logger.error("Falha ao enviar foto ao Cloudinary: %s", type(erro).__name__)
         raise HTTPException(
             status_code=502, detail="Não foi possível armazenar a foto agora"
         ) from None
