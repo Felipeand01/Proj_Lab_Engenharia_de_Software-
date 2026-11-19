@@ -38,6 +38,7 @@ export default function Entrar() {
   return (
     <Tela>
       <Text style={styles.titulo}>Entre na sua conta</Text>
+      <Text style={styles.sub}>Use o e-mail e a senha do seu cadastro de morador.</Text>
       <Campo
         rotulo="E-mail"
         value={email}
@@ -66,5 +67,6 @@ export default function Entrar() {
 
 const styles = StyleSheet.create({
   titulo: { fontSize: fonte.titulo, fontWeight: '700', color: cores.texto },
+  sub: { fontSize: fonte.corpo, color: cores.textoSuave },
   link: { color: cores.primaria, fontWeight: '700', textAlign: 'center', padding: 12 },
 });

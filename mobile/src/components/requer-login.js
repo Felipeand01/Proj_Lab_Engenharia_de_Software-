@@ -13,7 +13,7 @@ export default function RequerLogin({ motivo, children }) {
   if (usuario) return children;
 
   return (
-    <Vazio titulo="Entre para continuar" texto={motivo}>
+    <Vazio titulo="Entre para continuar" texto={motivo} icone="lock-closed-outline">
       <Botao titulo="Entrar" onPress={() => router.push('/entrar')} />
       <Botao titulo="Criar conta" variante="secundario" onPress={() => router.push('/cadastro')} />
     </Vazio>

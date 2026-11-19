@@ -23,3 +23,10 @@ backend/uploads/
 # Sistema operacional
 .DS_Store
 Thumbs.db
+
+# Documentação gerada automaticamente (CI/local)
+docs_geradas/
+
+# Relatórios do Playwright
+playwright-report/
+test-results/

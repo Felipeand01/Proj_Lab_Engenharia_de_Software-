@@ -17,6 +17,9 @@ export const CORES_STATUS = {
   Arquivado: { fundo: '#ECECEC', texto: '#4A4A4A' },
 };
 
+// Glifo do marcador/legenda: número da etapa no fluxo, para o status não depender só de cor.
+export const glifoStatus = (status) => String(Math.max(0, STATUS.indexOf(status)) + 1);
+
 // Apenas conveniência de UI: o backend é quem valida a transição.
 const PROXIMO = {
   Reportado: 'Em análise',

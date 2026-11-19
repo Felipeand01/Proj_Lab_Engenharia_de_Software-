@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
     "expo": "~57.0.25",
     "expo-constants": "~57.0.22",
     "expo-image-picker": "~57.0.20",
@@ -25,10 +26,12 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "export:web": "expo export --platform web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "e2e": "playwright test"
   },
   "private": true,
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2"
   }

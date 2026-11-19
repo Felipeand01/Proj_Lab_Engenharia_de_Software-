@@ -9,7 +9,8 @@ import Mensagem from './mensagem';
 
 // Escolhe uma foto (galeria no celular, seletor de arquivo no web) e mostra o preview.
 // O envio é feito pela tela, depois de criar a ocorrência.
-export default function SeletorFoto({ foto, onChange, desabilitado }) {
+// `obrigatoria` só muda o rótulo; quem valida o envio é a tela (e o backend).
+export default function SeletorFoto({ foto, onChange, desabilitado, obrigatoria = false }) {
   const [erro, setErro] = useState('');
 
   async function escolher() {
@@ -34,7 +35,7 @@ export default function SeletorFoto({ foto, onChange, desabilitado }) {
 
   return (
     <View style={styles.grupo}>
-      <Text style={styles.rotulo}>Foto (opcional)</Text>
+      <Text style={styles.rotulo}>{obrigatoria ? 'Foto (obrigatória)' : 'Foto (opcional)'}</Text>
       <Text style={styles.ajuda}>Uma foto ajuda a identificar o problema. JPEG, PNG ou WebP, até 5 MB.</Text>
 
       {foto ? (
@@ -51,13 +52,14 @@ export default function SeletorFoto({ foto, onChange, desabilitado }) {
           <Botao
             titulo={foto ? 'Trocar foto' : 'Escolher foto'}
             variante="secundario"
+            icone="image-outline"
             onPress={escolher}
             desabilitado={desabilitado}
           />
         </View>
         {foto ? (
           <View style={styles.acao}>
-            <Botao titulo="Remover foto" variante="perigo" onPress={() => onChange(null)} desabilitado={desabilitado} />
+            <Botao titulo="Remover foto" variante="secundario" icone="trash-outline" onPress={() => onChange(null)} desabilitado={desabilitado} />
           </View>
         ) : null}
       </View>

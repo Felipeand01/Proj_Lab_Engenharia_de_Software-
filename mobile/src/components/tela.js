@@ -18,5 +18,6 @@ export default function Tela({ children, estilo }) {
 const styles = StyleSheet.create({
   fundo: { flex: 1, backgroundColor: cores.fundo },
   conteudo: { flexGrow: 1, alignItems: 'center' },
-  coluna: { width: '100%', maxWidth: 640, padding: espaco.lg, gap: espaco.md },
+  // minWidth 0 evita que filhos largos estourem a coluna em telas de 360px.
+  coluna: { width: '100%', maxWidth: 640, minWidth: 0, padding: espaco.lg, paddingBottom: espaco.xl * 2, gap: espaco.md },
 });

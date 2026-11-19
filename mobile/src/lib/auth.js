@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { requisitar } from './api';
 import { lerToken, removerToken, salvarToken } from './storage';
@@ -9,11 +9,22 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
   const [usuario, setUsuario] = useState(null);
   const [restaurando, setRestaurando] = useState(true);
+  const tokenRef = useRef(null); // espelha o token para `sair` não depender de estado
 
+  // Revoga o token no servidor (best-effort: sem rede, a sessão local é encerrada igual).
   const sair = useCallback(async () => {
+    const atual = tokenRef.current;
+    tokenRef.current = null;
     setToken(null);
     setUsuario(null);
     await removerToken();
+    if (atual) {
+      try {
+        await requisitar('/auth/logout', { metodo: 'POST', token: atual });
+      } catch {
+        // token já inválido ou servidor fora do ar
+      }
+    }
   }, []);
 
   // Restaura a sessão salva e confirma o token no backend.
@@ -25,6 +36,7 @@ export function AuthProvider({ children }) {
         try {
           const eu = await requisitar('/auth/me', { token: salvo });
           if (ativo) {
+            tokenRef.current = salvo;
             setToken(salvo);
             setUsuario(eu);
           }
@@ -47,6 +59,7 @@ export function AuthProvider({ children }) {
     });
     const eu = await requisitar('/auth/me', { token: novo });
     await salvarToken(novo);
+    tokenRef.current = novo;
     setToken(novo);
     setUsuario(eu);
   }, []);

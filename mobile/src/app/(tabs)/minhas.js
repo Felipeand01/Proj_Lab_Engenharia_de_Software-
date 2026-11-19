@@ -16,12 +16,17 @@ function MinhasOcorrencias() {
   const { dados, carregando, erro, recarregar } = useCarregar(buscar);
 
   const lista = dados?.[aba] ?? [];
+  const contar = (chave) => (dados ? ` (${dados[chave].length})` : '');
 
   return (
     <Tela>
       <View style={styles.chips}>
-        <Chip rotulo="Criadas por mim" ativo={aba === 'criadas'} onPress={() => setAba('criadas')} />
-        <Chip rotulo="Confirmadas por mim" ativo={aba === 'confirmadas'} onPress={() => setAba('confirmadas')} />
+        <Chip rotulo={`Criadas${contar('criadas')}`} ativo={aba === 'criadas'} onPress={() => setAba('criadas')} />
+        <Chip
+          rotulo={`Confirmadas${contar('confirmadas')}`}
+          ativo={aba === 'confirmadas'}
+          onPress={() => setAba('confirmadas')}
+        />
       </View>
 
       {carregando && !dados ? <Carregando /> : null}
@@ -29,6 +34,7 @@ function MinhasOcorrencias() {
 
       {!erro && dados && lista.length === 0 ? (
         <Vazio
+          icone={aba === 'criadas' ? 'create-outline' : 'checkmark-done-outline'}
           titulo={aba === 'criadas' ? 'Você ainda não registrou ocorrências' : 'Você ainda não confirmou ocorrências'}
           texto={
             aba === 'criadas'

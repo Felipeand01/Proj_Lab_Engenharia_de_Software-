@@ -3,12 +3,14 @@ import { useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Carregando, ErroTela, Vazio } from '../../components/estado';
+import Icone from '../../components/icone';
+import Mensagem from '../../components/mensagem';
 import StatusBadge from '../../components/status-badge';
 import Tela from '../../components/tela';
 import { useAuth } from '../../lib/auth';
 import { STATUS } from '../../lib/status';
 import { useCarregar } from '../../lib/use-carregar';
-import { cores, fonte, raio } from '../../theme';
+import { alvoToque, contornoFoco, cores, fonte, raio } from '../../theme';
 
 function Indicadores() {
   const { api } = useAuth();
@@ -18,7 +20,7 @@ function Indicadores() {
 
   if (carregando && !dados) return <Carregando />;
   if (erro?.status === 403) {
-    return <Vazio titulo="Acesso negado" texto="Esta área é exclusiva para administradores." />;
+    return <Vazio icone="lock-closed-outline" titulo="Acesso negado" texto="Esta área é exclusiva para administradores." />;
   }
   if (erro) return <ErroTela erro={erro} onTentar={recarregar} />;
   if (!dados) return null;
@@ -26,6 +28,10 @@ function Indicadores() {
   return (
     <Tela>
       <Text style={styles.titulo}>Painel do administrador</Text>
+      <Mensagem tipo="aviso">
+        Os status são demonstrativos e não têm vínculo com a prefeitura: alterá-los não aciona nenhum atendimento
+        oficial.
+      </Mensagem>
       <Text style={styles.total}>
         {dados.total} {dados.total === 1 ? 'ocorrência registrada' : 'ocorrências registradas'}
       </Text>
@@ -37,17 +43,20 @@ function Indicadores() {
           key={s}
           accessibilityRole="button"
           accessibilityLabel={`${dados.por_status[s] ?? 0} ocorrências em ${s}`}
-          onPress={() => router.navigate({ pathname: '/', params: { status: s } })}
-          style={({ pressed }) => [styles.linha, pressed && { opacity: 0.8 }]}
+          onPress={() => router.navigate({ pathname: '/', params: { vista: 'lista', status: s } })}
+          style={({ pressed, focused }) => [styles.linha, pressed && { opacity: 0.8 }, focused && contornoFoco]}
         >
           <StatusBadge status={s} />
-          <Text style={styles.numero}>{dados.por_status[s] ?? 0}</Text>
+          <View style={styles.direita}>
+            <Text style={styles.numero}>{dados.por_status[s] ?? 0}</Text>
+            <Icone nome="chevron-forward" tamanho={18} cor={cores.textoSuave} />
+          </View>
         </Pressable>
       ))}
 
       <Text style={styles.secao}>Por categoria</Text>
       {Object.entries(dados.por_categoria).map(([nome, qtd]) => (
-        <View key={nome} style={styles.linha}>
+        <View key={nome} style={[styles.linha, styles.semBotao]}>
           <Text style={styles.nome}>{nome}</Text>
           <Text style={styles.numero}>{qtd}</Text>
         </View>
@@ -73,13 +82,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    minHeight: 48,
+    minHeight: alvoToque + 4,
+    gap: 8,
     backgroundColor: cores.superficie,
     borderRadius: raio.md,
     borderWidth: 1,
     borderColor: cores.borda,
     paddingHorizontal: 14,
   },
-  nome: { fontSize: fonte.corpo, color: cores.texto },
+  semBotao: { backgroundColor: 'transparent', borderWidth: 0, borderBottomWidth: 1, borderRadius: 0, paddingHorizontal: 4 },
+  direita: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  nome: { flexShrink: 1, fontSize: fonte.corpo, color: cores.texto },
   numero: { fontSize: fonte.subtitulo, fontWeight: '700', color: cores.texto },
 });

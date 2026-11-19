@@ -29,10 +29,68 @@ const TIMEOUT_MS = 15000;
 const TIMEOUT_UPLOAD_MS = 60000;
 
 export class ErroApi extends Error {
-  constructor(status, mensagem) {
+  // `campos`: mensagem por campo do formulário (ex.: { senha: '...' }) quando o servidor indica qual.
+  constructor(status, mensagem, campos = {}) {
     super(mensagem);
     this.status = status;
+    this.campos = campos;
   }
+}
+
+// Campos como o usuário os conhece. Campo fora da lista (ex.: "body", nomes internos) nunca
+// aparece na mensagem.
+const ROTULOS = {
+  nome: 'o nome',
+  email: 'o e-mail',
+  senha: 'a senha',
+  titulo: 'o título',
+  descricao: 'a descrição',
+  categoria_id: 'a categoria',
+  latitude: 'a latitude',
+  longitude: 'a longitude',
+  arquivo: 'a foto',
+  cep: 'o CEP',
+  uf: 'a UF',
+  motivo: 'o motivo',
+};
+const comMaiuscula = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+
+// Traduz um erro de validação do FastAPI/Pydantic em { campo, texto } em português.
+// Não usa `input` (o valor enviado, que pode ser uma senha) nem o texto em inglês do Pydantic.
+function erroDeValidacao(d) {
+  const ultimo = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : null;
+  const campo = typeof ultimo === 'string' && ultimo in ROTULOS ? ultimo : null;
+  const rotulo = campo ? ROTULOS[campo] : null;
+
+  // Validadores do próprio backend já escrevem a mensagem em português.
+  if (typeof d.msg === 'string' && d.msg.startsWith('Value error, ')) {
+    return { campo, texto: d.msg.slice('Value error, '.length) };
+  }
+  if (d.type === 'string_too_short' && rotulo) {
+    return { campo, texto: `${comMaiuscula(rotulo)} precisa ter ao menos ${d.ctx?.min_length} caracteres.` };
+  }
+  if (d.type === 'string_too_long' && rotulo) {
+    return { campo, texto: `${comMaiuscula(rotulo)} pode ter no máximo ${d.ctx?.max_length} caracteres.` };
+  }
+  if (campo === 'email' && d.type === 'string_pattern_mismatch') {
+    return { campo, texto: 'Informe um e-mail válido.' };
+  }
+  if (d.type === 'missing' && rotulo) return { campo, texto: `Informe ${rotulo}.` };
+  return { campo, texto: rotulo ? `Confira ${rotulo}.` : 'Alguns dados enviados são inválidos.' };
+}
+
+function traduzirValidacao(detalhe) {
+  const erros = detalhe.map(erroDeValidacao);
+  const campos = {};
+  erros.forEach(({ campo, texto }) => {
+    if (campo && !campos[campo]) campos[campo] = texto;
+  });
+  const textos = [...new Set(erros.map((e) => e.texto))].slice(0, 3);
+  return { mensagem: textos.join(' ') || 'Alguns dados enviados são inválidos.', campos };
+}
+
+function camposDeErro(status, corpo) {
+  return status === 422 && Array.isArray(corpo?.detail) ? traduzirValidacao(corpo.detail).campos : {};
 }
 
 // Converte o corpo de erro do FastAPI em texto amigável em PT-BR.
@@ -40,13 +98,7 @@ function mensagemDeErro(status, corpo) {
   const detalhe = corpo?.detail;
 
   if (status === 422 && Array.isArray(detalhe)) {
-    const campos = detalhe
-      .map((d) => (Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : null))
-      .filter(Boolean);
-    const lista = [...new Set(campos)].join(', ');
-    return lista
-      ? `Confira os campos: ${lista}.`
-      : 'Alguns dados enviados são inválidos.';
+    return traduzirValidacao(detalhe).mensagem;
   }
   if (typeof detalhe === 'string' && status !== 401 && status !== 403) {
     return detalhe;
@@ -54,6 +106,7 @@ function mensagemDeErro(status, corpo) {
   if (status === 401) return 'Sessão expirada ou inválida. Entre novamente.';
   if (status === 403) return 'Você não tem permissão para esta ação.';
   if (status === 404) return 'Não encontramos o que você procurou.';
+  if (status === 429) return 'Muitas tentativas em pouco tempo. Aguarde um instante e tente de novo.';
   if (status === 409) return 'Esta ação não é possível no estado atual.';
   if (status === 422) return 'Alguns dados enviados são inválidos.';
   return 'Algo deu errado no servidor. Tente novamente em instantes.';
@@ -99,7 +152,7 @@ export async function requisitar(caminho, { metodo = 'GET', corpo, token } = {})
   }
 
   if (!resposta.ok) {
-    throw new ErroApi(resposta.status, mensagemDeErro(resposta.status, dados));
+    throw new ErroApi(resposta.status, mensagemDeErro(resposta.status, dados), camposDeErro(resposta.status, dados));
   }
   return dados;
 }

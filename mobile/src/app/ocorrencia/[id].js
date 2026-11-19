@@ -1,11 +1,12 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Image, Linking, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 
 import Botao from '../../components/botao';
 import Campo from '../../components/campo';
 import { formatarData } from '../../components/cartao-ocorrencia';
 import { Carregando, ErroTela, Vazio } from '../../components/estado';
+import MapaOcorrencias from '../../components/mapa-ocorrencias';
 import Mensagem from '../../components/mensagem';
 import StatusBadge from '../../components/status-badge';
 import Tela from '../../components/tela';
@@ -13,9 +14,6 @@ import { useAuth } from '../../lib/auth';
 import { podeArquivar, proximoStatus } from '../../lib/status';
 import { useCarregar } from '../../lib/use-carregar';
 import { cores, fonte, raio } from '../../theme';
-
-const linkMapa = (lat, lon) =>
-  `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}`;
 
 export default function DetalheOcorrencia() {
   const { id } = useLocalSearchParams();
@@ -29,7 +27,11 @@ export default function DetalheOcorrencia() {
   const [motivo, setMotivo] = useState('');
   const [fotoComErro, setFotoComErro] = useState(false);
 
-  async function executar(nome, caminho, opcoes, sucesso) {
+  // Confirmação antes de ações difíceis de desfazer (window.confirm no web; no celular segue direto).
+  const confirmarAcao = (texto) => Platform.OS !== 'web' || window.confirm(texto);
+
+  async function executar(nome, caminho, opcoes, sucesso, aviso) {
+    if (aviso && !confirmarAcao(aviso)) return;
     setAcao(nome);
     setFeedback(null);
     try {
@@ -57,6 +59,16 @@ export default function DetalheOcorrencia() {
 
   const proximo = proximoStatus(o.status);
   const arquivada = o.status === 'Arquivado';
+  const ehAutor = o.eh_autor === true;
+  const endereco = [
+    [o.logradouro, o.numero].filter(Boolean).join(', '),
+    o.complemento,
+    o.bairro,
+    [o.cidade, o.uf].filter(Boolean).join(' - '),
+    o.cep,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <Tela>
@@ -84,16 +96,16 @@ export default function DetalheOcorrencia() {
 
       <View style={styles.bloco}>
         <Text style={styles.secao}>Local</Text>
-        <Text style={styles.texto}>
-          Latitude {o.latitude.toFixed(5)} · Longitude {o.longitude.toFixed(5)}
-        </Text>
-        <Text
-          accessibilityRole="link"
-          style={styles.link}
-          onPress={() => Linking.openURL(linkMapa(o.latitude, o.longitude))}
-        >
-          Ver no mapa
-        </Text>
+        {endereco ? <Text style={styles.texto}>{endereco}</Text> : null}
+        {!endereco ? (
+          <Text style={styles.meta}>
+            Latitude {o.latitude.toFixed(5)} · Longitude {o.longitude.toFixed(5)}
+          </Text>
+        ) : null}
+        <View style={styles.minimapa}>
+          <MapaOcorrencias ocorrencias={[o]} />
+        </View>
+        <Botao titulo="Ver no mapa" onPress={() => router.push(`/?vista=mapa&foco=${o.id}`)} />
       </View>
 
       {o.motivo_arquivamento ? (
@@ -107,7 +119,13 @@ export default function DetalheOcorrencia() {
         <Text style={styles.meta}>
           Confirmações indicam apoio da comunidade; não alteram o status nem a prioridade de atendimento.
         </Text>
-        {usuario ? (
+        {!usuario ? (
+          <Botao titulo="Entre para confirmar" variante="secundario" onPress={() => router.push('/entrar')} />
+        ) : admin ? null : ehAutor ? (
+          <Text style={styles.meta}>Você registrou esta ocorrência. A confirmação é feita por outros moradores.</Text>
+        ) : o.confirmado_por_mim ? (
+          <Botao titulo="Você já confirmou" variante="secundario" desabilitado onPress={() => {}} />
+        ) : (
           <Botao
             titulo="Confirmar esta ocorrência"
             onPress={() =>
@@ -116,8 +134,6 @@ export default function DetalheOcorrencia() {
             carregando={acao === 'confirmar'}
             desabilitado={arquivada}
           />
-        ) : (
-          <Botao titulo="Entre para confirmar" variante="secundario" onPress={() => router.push('/entrar')} />
         )}
         {arquivada ? <Text style={styles.meta}>Ocorrências arquivadas não recebem confirmações.</Text> : null}
       </View>
@@ -153,6 +169,7 @@ export default function DetalheOcorrencia() {
                   `/admin/ocorrencias/${o.id}/status`,
                   { metodo: 'PATCH', corpo: { status: proximo } },
                   `Status atualizado para ${proximo}.`,
+                  `Mover esta ocorrência para "${proximo}"?`,
                 )
               }
               carregando={acao === 'status'}
@@ -178,6 +195,7 @@ export default function DetalheOcorrencia() {
                     `/admin/ocorrencias/${o.id}/arquivar`,
                     { metodo: 'POST', corpo: { motivo: motivo.trim() } },
                     'Ocorrência arquivada.',
+                    'Arquivar esta ocorrência? Ela deixará de aparecer para os demais moradores.',
                   )
                 }
                 carregando={acao === 'arquivar'}
@@ -197,8 +215,8 @@ const styles = StyleSheet.create({
   titulo: { fontSize: fonte.titulo, fontWeight: '700', color: cores.texto },
   meta: { fontSize: fonte.pequena, color: cores.textoSuave },
   texto: { fontSize: fonte.corpo, color: cores.texto, lineHeight: 22 },
+  minimapa: { height: 220, borderRadius: raio.md, overflow: 'hidden' },
   foto: { width: '100%', height: 200, borderRadius: raio.md, backgroundColor: cores.borda },
-  link: { color: cores.primaria, fontWeight: '700', fontSize: fonte.corpo },
   bloco: {
     backgroundColor: cores.superficie,
     borderRadius: raio.md,
