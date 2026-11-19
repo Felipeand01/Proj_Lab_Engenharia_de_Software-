@@ -84,6 +84,32 @@ def test_cadastro_com_dados_invalidos_retorna_422(client):
         assert client.post("/auth/cadastro", json=dados).status_code == 422
 
 
+def test_senha_comum_ou_parecida_com_email_tem_mensagem_em_portugues(client):
+    """Regras inalteradas, agora com mensagem clara: lista de senhas comuns e senha igual
+    ao e-mail ou à parte antes do @, sem diferenciar maiúsculas e ignorando espaços nas
+    pontas. O 422 vem sem campo (`loc` = body), como o frontend espera."""
+    mensagem = (
+        "Value error, Essa senha é muito comum ou igual ao seu e-mail. Escolha outra."
+    )
+    unico = uuid.uuid4().hex[:12]
+    casos = [
+        ("SENHA123", novo_email()),  # maiúsculas não escapam da lista
+        ("  12345678  ", novo_email()),  # espaços nas pontas são ignorados
+        (
+            f"USER-{unico}",
+            f"user-{unico}@exemplo.com",
+        ),  # parte local, sem diferenciar caixa
+    ]
+    for senha, email in casos:
+        resposta = client.post(
+            "/auth/cadastro", json={"nome": "Maria", "email": email, "senha": senha}
+        )
+        assert resposta.status_code == 422, senha
+        erro = resposta.json()["detail"][0]
+        assert erro["msg"] == mensagem
+        assert erro["loc"] == ["body"]
+
+
 # --- login ---
 
 

@@ -23,6 +23,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements-dev.txt
 
+      - name: Ruff (lint)
+        run: ruff check backend
+
+      - name: Ruff (formatação)
+        run: ruff format --check backend
+
       - name: Run backend tests
         run: |
           python -m pytest backend/tests -v \
@@ -35,3 +41,61 @@ jobs:
         with:
           name: backend-test-report
           path: relatorio_testes.html
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Expo lint
+        run: npx expo lint
+
+  docs:
+    runs-on: ubuntu-latest
+    env:
+      # Valores só para importar os módulos; não são segredos.
+      JWT_SECRET: ci-somente-para-gerar-documentacao-0123456789
+      DATABASE_URL: sqlite:///ci_docs.db
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+
+      - name: Gerar documentação do código e dos testes (pdoc)
+        run: python -m pdoc -o docs_geradas/pdoc backend.app backend.tests
+
+      - name: Exportar OpenAPI
+        run: |
+          mkdir -p docs_geradas
+          python -c "import json; from backend.app.main import app; open('docs_geradas/openapi.json','w').write(json.dumps(app.openapi(), indent=2, ensure_ascii=False))"
+
+      - name: Upload documentação
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentacao-automatica
+          path: docs_geradas

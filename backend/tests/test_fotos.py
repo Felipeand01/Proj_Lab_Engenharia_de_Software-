@@ -118,7 +118,8 @@ def test_outro_morador_nao_envia_foto_retorna_403(client, ocorrencia):
     outro = autenticar(client)
 
     assert enviar(client, ocorrencia["id"], outro).status_code == 403
-    assert client.get(f"/ocorrencias/{ocorrencia['id']}").json()["foto_url"] is None
+    foto = client.get(f"/ocorrencias/{ocorrencia['id']}").json()["foto_url"]
+    assert foto == ocorrencia["foto_url"]  # a foto original não foi trocada
 
 
 def test_enviar_foto_de_ocorrencia_inexistente_retorna_404(client, morador):
@@ -173,7 +174,7 @@ def test_imagem_com_pixels_demais_retorna_422(client, morador, ocorrencia, monke
 def test_criar_ocorrencia_ignora_foto_url_enviada_pelo_cliente(client, morador):
     criada = criar(client, morador, foto_url="https://exemplo.com/foto.jpg")
 
-    assert criada["foto_url"] is None
+    assert criada["foto_url"] != "https://exemplo.com/foto.jpg"
 
 
 # --- Cloudinary (HTTPS + Basic Auth), sem rede real ---
@@ -233,7 +234,8 @@ def test_falha_do_cloudinary_retorna_502_e_nao_altera_a_ocorrencia(
 
     assert resposta.status_code == 502
     assert "sem rede" not in resposta.text
-    assert client.get(f"/ocorrencias/{ocorrencia['id']}").json()["foto_url"] is None
+    foto = client.get(f"/ocorrencias/{ocorrencia['id']}").json()["foto_url"]
+    assert foto == ocorrencia["foto_url"]
 
 
 def test_erro_http_do_cloudinary_registra_so_o_codigo_de_status(

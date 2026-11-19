@@ -1,3 +1,4 @@
+import io
 import os
 import shutil
 import tempfile
@@ -6,13 +7,22 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from backend.tests.guarda import validar_url_teste
+
 TEST_DB_PATH = Path(__file__).parent / "test.db"
 
-# Padrão: SQLite descartável. Com TEST_DATABASE_URL a suíte roda em outro banco
-# (ex.: PostgreSQL). Atenção: os testes APAGAM as tabelas desse banco.
-os.environ["DATABASE_URL"] = os.getenv(
+# Padrão: SQLite descartável. Com TEST_DATABASE_URL a suíte roda em outro banco, mas
+# só se for dedicado a testes (ver guarda.py): os testes APAGAM as tabelas dele.
+# Nunca herda DATABASE_URL.
+_url_teste = os.getenv(
     "TEST_DATABASE_URL", f"sqlite:///{TEST_DB_PATH}?check_same_thread=false"
 )
+_motivo = validar_url_teste(_url_teste)
+if _motivo:
+    pytest.exit(f"TEST_DATABASE_URL recusada, nada foi apagado: {_motivo}", 2)
+os.environ["DATABASE_URL"] = _url_teste
+# Rate limit desligado nos testes; os testes de 429 o religam explicitamente.
+os.environ["RATE_LIMIT"] = "0"
 # Segredo apenas para testes; em produção vem do ambiente.
 os.environ["JWT_SECRET"] = "segredo-somente-para-testes-automatizados-0123456789"
 # Fotos dos testes vão para uma pasta temporária, removida ao final da sessão.
@@ -51,3 +61,28 @@ def client():
     """Disponibiliza um cliente HTTP para testar a API."""
 
     return TestClient(app)
+
+
+def foto_png(tamanho=(40, 30)) -> bytes:
+    """PNG válido e pequeno para os testes de envio de foto."""
+    from PIL import Image
+
+    saida = io.BytesIO()
+    Image.new("RGB", tamanho, "red").save(saida, format="PNG")
+    return saida.getvalue()
+
+
+def enviar_ocorrencia(client, headers, dados, foto=None, chave=None):
+    """POST multipart /ocorrencias; `dados` são os campos do formulário.
+
+    `foto=None` usa um PNG válido; `chave=None` gera uma chave_envio nova.
+    """
+    import uuid
+
+    campos = {"chave_envio": chave or str(uuid.uuid4()), **dados}
+    return client.post(
+        "/ocorrencias",
+        data={k: str(v) for k, v in campos.items()},
+        files={"arquivo": ("foto.png", foto or foto_png(), "image/png")},
+        headers=headers,
+    )

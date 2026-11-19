@@ -199,11 +199,17 @@ def test_confirmar_arquivada_por_terceiro_retorna_404_sem_registrar(client, cena
     assert visto_pelo_admin.json()["total_confirmacoes"] == 0
 
 
-@pytest.mark.parametrize("quem", ["autor", "admin"])
-def test_confirmar_arquivada_por_autor_ou_admin_retorna_409(client, cenario, quem):
-    resposta = confirmar(client, cenario["arquivada"], cenario[quem])
+def test_confirmar_arquivada_pelo_autor_retorna_409(client, cenario):
+    resposta = confirmar(client, cenario["arquivada"], cenario["autor"])
 
     assert resposta.status_code == 409
+
+
+def test_confirmar_arquivada_pelo_admin_retorna_403(client, cenario):
+    """Administrador nunca confirma, nem arquivada (papel antes do estado)."""
+    resposta = confirmar(client, cenario["arquivada"], cenario["admin"])
+
+    assert resposta.status_code == 403
 
 
 # --- minhas ocorrências ---

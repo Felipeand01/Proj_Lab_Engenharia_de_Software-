@@ -6,6 +6,7 @@ import pytest
 
 from backend.app.database import SessionLocal
 from backend.app.models import Ocorrencia
+from backend.tests.conftest import enviar_ocorrencia
 
 SENHA = "senha-segura-123"
 DADOS = {
@@ -28,7 +29,7 @@ def autenticar(client) -> dict:
 
 
 def criar(client, headers, **alterado) -> dict:
-    resposta = client.post("/ocorrencias", json={**DADOS, **alterado}, headers=headers)
+    resposta = enviar_ocorrencia(client, headers, {**DADOS, **alterado})
     assert resposta.status_code == 201, resposta.text
     return resposta.json()
 
@@ -54,7 +55,8 @@ def test_criar_ocorrencia_inicia_reportada_com_historico(client, morador):
     assert criada["categoria"] == {"id": 3, "nome": "Infraestrutura"}
     assert criada["autor_nome"] == "Morador"
     assert criada["total_confirmacoes"] == 0
-    assert criada["foto_url"] is None  # a foto entra por POST /ocorrencias/{id}/foto
+    assert criada["foto_url"].startswith("http")  # foto obrigatória no multipart
+    assert criada["confirmado_por_mim"] is False
     assert len(criada["historico"]) == 1
     assert criada["historico"][0]["status_anterior"] is None
     assert criada["historico"][0]["status_novo"] == "Reportado"
@@ -68,7 +70,7 @@ def test_criar_ignora_status_e_autor_enviados_pelo_cliente(client, morador):
 
 
 def test_criar_sem_token_retorna_401(client):
-    assert client.post("/ocorrencias", json=DADOS).status_code == 401
+    assert enviar_ocorrencia(client, None, DADOS).status_code == 401
 
 
 @pytest.mark.parametrize(
@@ -88,7 +90,7 @@ def test_criar_sem_token_retorna_401(client):
     ],
 )
 def test_criar_com_dados_invalidos_retorna_422(client, morador, alteracao):
-    resposta = client.post("/ocorrencias", json={**DADOS, **alteracao}, headers=morador)
+    resposta = enviar_ocorrencia(client, morador, {**DADOS, **alteracao})
 
     assert resposta.status_code == 422
 
@@ -96,15 +98,11 @@ def test_criar_com_dados_invalidos_retorna_422(client, morador, alteracao):
 def test_criar_sem_campo_obrigatorio_retorna_422(client, morador):
     sem_titulo = {k: v for k, v in DADOS.items() if k != "titulo"}
 
-    assert (
-        client.post("/ocorrencias", json=sem_titulo, headers=morador).status_code == 422
-    )
+    assert enviar_ocorrencia(client, morador, sem_titulo).status_code == 422
 
 
 def test_criar_com_categoria_inexistente_retorna_422(client, morador):
-    resposta = client.post(
-        "/ocorrencias", json={**DADOS, "categoria_id": 999}, headers=morador
-    )
+    resposta = enviar_ocorrencia(client, morador, {**DADOS, "categoria_id": 999})
 
     assert resposta.status_code == 422
 

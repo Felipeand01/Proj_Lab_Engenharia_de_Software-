@@ -33,6 +33,11 @@ class Usuario(Base):
 
 class Ocorrencia(Base):
     __tablename__ = "ocorrencias"
+    # Reenvio com a mesma chave_envio do mesmo autor não duplica a ocorrência. O nome
+    # é o mesmo usado em migrar.py, para create_all e migração gerarem o mesmo esquema.
+    __table_args__ = (
+        UniqueConstraint("autor_id", "chave_envio", name="uq_ocorrencias_autor_chave"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     autor_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
@@ -44,6 +49,15 @@ class Ocorrencia(Base):
     foto_url: Mapped[str | None] = mapped_column(String(500))
     latitude: Mapped[float] = mapped_column(Float, nullable=False)
     longitude: Mapped[float] = mapped_column(Float, nullable=False)
+    # Endereço opcional (nulo em registros antigos e quando só há GPS/minimapa).
+    cep: Mapped[str | None] = mapped_column(String(8))
+    logradouro: Mapped[str | None] = mapped_column(String(200))
+    numero: Mapped[str | None] = mapped_column(String(20))
+    complemento: Mapped[str | None] = mapped_column(String(100))
+    bairro: Mapped[str | None] = mapped_column(String(100))
+    cidade: Mapped[str | None] = mapped_column(String(100))
+    uf: Mapped[str | None] = mapped_column(String(2))
+    chave_envio: Mapped[str | None] = mapped_column(String(36))
     status: Mapped[str] = mapped_column(String(20), default="Reportado", nullable=False)
     motivo_arquivamento: Mapped[str | None] = mapped_column(String(500))
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
@@ -89,3 +103,12 @@ class HistoricoStatus(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=agora)
 
     ocorrencia: Mapped[Ocorrencia] = relationship(back_populates="historico")
+
+
+class TokenRevogado(Base):
+    """JWTs invalidados por logout. `expira_em` permite limpar linhas já vencidas."""
+
+    __tablename__ = "tokens_revogados"
+
+    jti: Mapped[str] = mapped_column(String(36), primary_key=True)
+    expira_em: Mapped[datetime] = mapped_column(DateTime, nullable=False)

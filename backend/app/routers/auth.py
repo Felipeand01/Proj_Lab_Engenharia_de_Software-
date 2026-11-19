@@ -1,16 +1,21 @@
 """Cadastro, login e consulta do usuário autenticado."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from backend.app.limite import limitar
+from backend.app.logs import registrar_evento
 from backend.app.models import Usuario
 from backend.app.schemas import CadastroIn, LoginIn, TokenOut, UsuarioOut
 from backend.app.security import (
     criar_token,
     gerar_hash,
+    _bearer,
     get_db,
+    revogar_token,
     usuario_atual,
     verificar_senha,
 )
@@ -22,7 +27,12 @@ router = APIRouter(prefix="/auth", tags=["Autenticação"])
 _HASH_FALSO = gerar_hash("senha-que-nao-existe")
 
 
-@router.post("/cadastro", response_model=UsuarioOut, status_code=201)
+@router.post(
+    "/cadastro",
+    response_model=UsuarioOut,
+    status_code=201,
+    dependencies=[Depends(limitar("cadastro"))],
+)
 def cadastrar(dados: CadastroIn, db: Session = Depends(get_db)):
     """Cria uma conta de morador. O papel nunca vem do cliente."""
     if db.scalar(select(Usuario).where(Usuario.email == dados.email)):
@@ -43,14 +53,17 @@ def cadastrar(dados: CadastroIn, db: Session = Depends(get_db)):
     return usuario
 
 
-@router.post("/login", response_model=TokenOut)
-def login(dados: LoginIn, db: Session = Depends(get_db)):
+@router.post(
+    "/login", response_model=TokenOut, dependencies=[Depends(limitar("login"))]
+)
+def login(request: Request, dados: LoginIn, db: Session = Depends(get_db)):
     """Autentica por e-mail e senha e devolve um JWT com expiração."""
     usuario = db.scalar(select(Usuario).where(Usuario.email == dados.email))
     senha_ok = verificar_senha(
         dados.senha, usuario.senha_hash if usuario else _HASH_FALSO
     )
     if usuario is None or not senha_ok:
+        registrar_evento(request, "login_falho")
         raise HTTPException(status_code=401, detail="E-mail ou senha inválidos")
     return TokenOut(access_token=criar_token(usuario))
 
@@ -59,3 +72,14 @@ def login(dados: LoginIn, db: Session = Depends(get_db)):
 def me(usuario: Usuario = Depends(usuario_atual)):
     """Devolve os dados do usuário dono do token."""
     return usuario
+
+
+@router.post("/logout", status_code=204)
+def logout(
+    credenciais: HTTPAuthorizationCredentials = Depends(_bearer),
+    usuario: Usuario = Depends(usuario_atual),
+    db: Session = Depends(get_db),
+):
+    """Revoga o token atual: ele passa a retornar 401 (sem token válido, 401 também)."""
+    revogar_token(db, credenciais.credentials)
+    return Response(status_code=204)

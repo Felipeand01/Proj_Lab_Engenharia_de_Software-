@@ -181,11 +181,11 @@ def test_arquivar_inexistente_retorna_404(client, admin):
 def test_ocorrencia_arquivada_nao_aceita_confirmacao(client, admin, ocorrencia):
     arquivar(client, admin, ocorrencia["id"])
 
-    # O administrador enxerga a arquivada, mas ela não aceita confirmações (409).
-    # Para terceiros ela nem existe (404): ver test_visibilidade_arquivadas.py.
+    # O administrador nunca confirma (403); o autor recebe 409 numa arquivada e
+    # terceiros 404: ver test_visibilidade_arquivadas.py.
     resposta = client.post(f"/ocorrencias/{ocorrencia['id']}/confirmar", headers=admin)
 
-    assert resposta.status_code == 409
+    assert resposta.status_code == 403
 
 
 def test_confirmacao_nao_altera_status_nem_historico(client, admin, ocorrencia):

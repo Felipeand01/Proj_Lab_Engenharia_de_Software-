@@ -1,8 +1,17 @@
 """Ocorrências: criação, consulta, confirmação comunitária e listas do usuário."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -12,9 +21,10 @@ from backend.app.models import Categoria, Confirmacao, Ocorrencia, Usuario
 from backend.app.schemas import (
     MinhasOcorrenciasOut,
     OcorrenciaDetalhe,
-    OcorrenciaIn,
+    OcorrenciaForm,
     OcorrenciaOut,
 )
+from backend.app.limite import limitar
 from backend.app.security import get_db, usuario_atual, usuario_opcional
 from backend.app.status import ARQUIVADO, REPORTADO, TODOS_STATUS, registrar_mudanca
 
@@ -39,6 +49,13 @@ def resumo(ocorrencia: Ocorrencia) -> OcorrenciaOut:
         foto_url=ocorrencia.foto_url,
         latitude=ocorrencia.latitude,
         longitude=ocorrencia.longitude,
+        cep=ocorrencia.cep,
+        logradouro=ocorrencia.logradouro,
+        numero=ocorrencia.numero,
+        complemento=ocorrencia.complemento,
+        bairro=ocorrencia.bairro,
+        cidade=ocorrencia.cidade,
+        uf=ocorrencia.uf,
         status=ocorrencia.status,
         motivo_arquivamento=ocorrencia.motivo_arquivamento,
         criado_em=ocorrencia.criado_em,
@@ -48,10 +65,19 @@ def resumo(ocorrencia: Ocorrencia) -> OcorrenciaOut:
     )
 
 
-def detalhe(ocorrencia: Ocorrencia) -> OcorrenciaDetalhe:
+def detalhe(
+    ocorrencia: Ocorrencia, usuario: Usuario | None = None
+) -> OcorrenciaDetalhe:
+    """Detalhe com histórico; `confirmado_por_mim` só é verdadeiro para quem confirmou.
+
+    O histórico não expõe quem alterou o status (privacidade do administrador).
+    """
     return OcorrenciaDetalhe(
         **resumo(ocorrencia).model_dump(),
         historico=ocorrencia.historico,
+        confirmado_por_mim=usuario is not None
+        and any(c.usuario_id == usuario.id for c in ocorrencia.confirmacoes),
+        eh_autor=usuario is not None and usuario.id == ocorrencia.autor_id,
     )
 
 
@@ -91,15 +117,33 @@ def buscar_visivel_ou_404(
 def listar(
     categoria_id: int | None = None,
     status: StatusFiltro | None = None,
+    min_lat: Annotated[float | None, Query(ge=-90, le=90)] = None,
+    max_lat: Annotated[float | None, Query(ge=-90, le=90)] = None,
+    min_lon: Annotated[float | None, Query(ge=-180, le=180)] = None,
+    max_lon: Annotated[float | None, Query(ge=-180, le=180)] = None,
     db: Session = Depends(get_db),
     usuario: Usuario | None = Depends(usuario_opcional),
 ):
     """Lista ocorrências, da mais recente para a mais antiga.
 
+    Filtro geográfico opcional: `min_lat`, `max_lat`, `min_lon` e `max_lon` devem vir
+    todos juntos (e com mínimo <= máximo), senão 422. Combina com categoria e status.
+
     Pública, mas sem arquivadas: só o administrador as recebe (inclusive com
     `status=Arquivado`; para os demais esse filtro devolve lista vazia).
     """
+    limites = (min_lat, max_lat, min_lon, max_lon)
+    if any(v is not None for v in limites):
+        if any(v is None for v in limites):
+            raise HTTPException(status_code=422, detail="Informe os 4 limites da área")
+        if min_lat > max_lat or min_lon > max_lon:
+            raise HTTPException(status_code=422, detail="Área inválida")
     consulta = select(Ocorrencia).options(*CARREGAR).order_by(Ocorrencia.id.desc())
+    if min_lat is not None:
+        consulta = consulta.where(
+            Ocorrencia.latitude.between(min_lat, max_lat),
+            Ocorrencia.longitude.between(min_lon, max_lon),
+        )
     if usuario is None or usuario.papel != "admin":
         consulta = consulta.where(Ocorrencia.status != ARQUIVADO)
     if categoria_id is not None:
@@ -116,27 +160,80 @@ def consultar(
     usuario: Usuario | None = Depends(usuario_opcional),
 ):
     """Detalhes e histórico (público). Arquivada: 404, salvo para o autor e o admin."""
-    return detalhe(buscar_visivel_ou_404(db, ocorrencia_id, usuario))
+    return detalhe(buscar_visivel_ou_404(db, ocorrencia_id, usuario), usuario)
 
 
-@router.post("/ocorrencias", response_model=OcorrenciaDetalhe, status_code=201)
+def _buscar_por_chave(db: Session, autor_id: int, chave: str) -> Ocorrencia | None:
+    return db.scalar(
+        select(Ocorrencia)
+        .where(Ocorrencia.autor_id == autor_id, Ocorrencia.chave_envio == chave)
+        .options(*CARREGAR)
+    )
+
+
+@router.post(
+    "/ocorrencias",
+    response_model=OcorrenciaDetalhe,
+    status_code=201,
+    dependencies=[Depends(limitar("criar_ocorrencia"))],
+)
 def criar(
-    dados: OcorrenciaIn,
+    dados: Annotated[OcorrenciaForm, Form()],
+    arquivo: UploadFile,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(usuario_atual),
 ):
-    """Registra uma ocorrência com status inicial Reportado."""
+    """Registra uma ocorrência (multipart, foto obrigatória) numa única requisição.
+
+    Ordem: formulário válido, categoria, foto (reencode), armazenamento, e só então
+    INSERT + histórico + commit. Qualquer falha antes do commit não deixa linha.
+    Reenvio com a mesma `chave_envio` devolve a ocorrência já criada (200), sem novo
+    upload. Administrador não cria ocorrências (403).
+    """
+    if usuario.papel == "admin":
+        raise HTTPException(
+            status_code=403, detail="Administradores não registram ocorrências"
+        )
+    chave = str(dados.chave_envio)
+    existente = _buscar_por_chave(db, usuario.id, chave)
+    if existente is not None:
+        response.status_code = 200
+        return detalhe(existente, usuario)
+
     if db.get(Categoria, dados.categoria_id) is None:
         raise HTTPException(status_code=422, detail="Categoria inexistente")
 
-    ocorrencia = Ocorrencia(**dados.model_dump(), autor_id=usuario.id)
+    # Lê no máximo o limite + 1 byte: o excedente nunca vai para a memória.
+    jpeg = fotos.reencodar(arquivo.file.read(fotos.MAX_BYTES + 1))
+    foto_url = fotos.armazenar(jpeg, request)
+
+    campos = dados.model_dump(exclude={"chave_envio"})
+    ocorrencia = Ocorrencia(
+        **campos, chave_envio=chave, foto_url=foto_url, autor_id=usuario.id
+    )
     registrar_mudanca(db, ocorrencia, REPORTADO, usuario)
     db.add(ocorrencia)
-    db.commit()
-    return detalhe(buscar_ou_404(db, ocorrencia.id))
+    try:
+        db.commit()
+    except IntegrityError:  # reenvio simultâneo com a mesma chave
+        db.rollback()
+        existente = _buscar_por_chave(db, usuario.id, chave)
+        if existente is None:
+            raise HTTPException(
+                status_code=409, detail="Não foi possível registrar a ocorrência"
+            ) from None
+        response.status_code = 200
+        return detalhe(existente, usuario)
+    return detalhe(buscar_ou_404(db, ocorrencia.id), usuario)
 
 
-@router.post("/ocorrencias/{ocorrencia_id}/foto", response_model=OcorrenciaDetalhe)
+@router.post(
+    "/ocorrencias/{ocorrencia_id}/foto",
+    response_model=OcorrenciaDetalhe,
+    dependencies=[Depends(limitar("trocar_foto"))],
+)
 def enviar_foto(
     ocorrencia_id: int,
     request: Request,
@@ -155,7 +252,7 @@ def enviar_foto(
     conteudo = arquivo.file.read(fotos.MAX_BYTES + 1)
     ocorrencia.foto_url = fotos.armazenar(fotos.reencodar(conteudo), request)
     db.commit()
-    return detalhe(buscar_ou_404(db, ocorrencia_id))
+    return detalhe(buscar_ou_404(db, ocorrencia_id), usuario)
 
 
 @router.post(
@@ -168,10 +265,21 @@ def confirmar(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(usuario_atual),
 ):
-    """Confirma uma ocorrência (uma vez por usuário). Não altera o status."""
+    """Confirma uma ocorrência (uma vez por usuário). Não altera o status.
+
+    Confirmação é apoio de outros moradores: administrador e o próprio autor recebem 403.
+    """
     ocorrencia = buscar_visivel_ou_404(db, ocorrencia_id, usuario)
+    if usuario.papel == "admin":
+        raise HTTPException(
+            status_code=403, detail="Administradores não confirmam ocorrências"
+        )
     if ocorrencia.status == ARQUIVADO:
         raise HTTPException(status_code=409, detail="Ocorrência arquivada")
+    if ocorrencia.autor_id == usuario.id:
+        raise HTTPException(
+            status_code=403, detail="Você não pode confirmar a própria ocorrência"
+        )
 
     ja_confirmou = db.scalar(
         select(Confirmacao).where(
