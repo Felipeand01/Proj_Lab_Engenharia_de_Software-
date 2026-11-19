@@ -12,7 +12,21 @@ node_modules/
 # Variáveis de ambiente
 .env
 .env.*
+!.env.example
+
+# Fotos do armazenamento local de desenvolvimento
+backend/uploads/
+
+# Artefatos locais do Playwright
+.playwright-mcp/
 
 # Sistema operacional
 .DS_Store
 Thumbs.db
+
+# Documentação gerada automaticamente (CI/local)
+docs_geradas/
+
+# Relatórios do Playwright
+playwright-report/
+test-results/

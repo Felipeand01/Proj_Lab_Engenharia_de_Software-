@@ -1,0 +1,7 @@
+-r requirements.txt
+pytest
+httpx
+pytest-html
+ruff
+pip-audit
+pdoc
