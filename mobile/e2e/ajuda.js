@@ -12,7 +12,7 @@ const PNG_1X1 = Buffer.from(
   'base64',
 );
 
-const unico = (prefixo) => `${prefixo}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+const unico = (prefixo) => `${prefixo}-${crypto.randomUUID()}`;
 
 async function pedir(caminho, { token, metodo = 'GET', json, form } = {}) {
   const r = await fetch(`${API}${caminho}`, {

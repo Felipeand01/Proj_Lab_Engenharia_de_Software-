@@ -143,7 +143,10 @@ def test_chamadas_ao_nominatim_respeitam_1_segundo(client, externo):
 
 def test_user_agent_identifica_o_app_sem_email():
     assert "AmigoDaVizinhanca" in localizacao.USER_AGENT
-    assert "github.com" in localizacao.USER_AGENT
+    assert localizacao.USER_AGENT == (
+        "AmigoDaVizinhanca/0.1 (projeto academico; "
+        "https://github.com/Felipeand01/Proj_Lab_Engenharia_de_Software-)"
+    )
     assert "@" not in localizacao.USER_AGENT
 
 
